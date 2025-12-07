@@ -7,7 +7,7 @@ use App\Models\Payment;
 
 class PaymentController extends Controller
 {
-    // ADMIN: View all payments
+    // ADMIN: View all payments (walk-in + online)
     public function index(Request $request)
     {
         if ($request->user()->role !== 'admin') {
@@ -15,60 +15,57 @@ class PaymentController extends Controller
         }
 
         $payments = Payment::with([
-            'appointment.customer',
+            'appointment.user',     // Flutter user
+            'appointment.customer', // Walk-in
             'appointment.service'
-        ])->latest()->get();
+        ])
+        ->latest()
+        ->get();
 
         return response()->json(['data' => $payments]);
     }
 
-    // ADMIN: Create payment
+    // ADMIN: Create payment manually (optional)
     public function store(Request $request)
     {
         if ($request->user()->role !== 'admin') {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $validated = $request->validate([
+        $data = $request->validate([
             'appointment_id' => 'required|exists:appointments,id',
-            'amount'         => 'required|numeric|min:0',
-            'method'         => 'nullable|string',
+            'amount' => 'required|numeric|min:0',
+            'method' => 'nullable|string',
+            'status' => 'nullable|string',
         ]);
 
-        $validated['status'] = 'pending';
+        $data['status'] = $data['status'] ?? 'pending';
 
-        $payment = Payment::create($validated);
+        $payment = Payment::create($data);
 
-        return response()->json([
-            'message' => 'Payment added successfully',
-            'data' => $payment
-        ], 201);
+        return response()->json(['data' => $payment], 201);
     }
 
-    // ADMIN: Confirm payment
+    // ADMIN: Update payment (mark as paid)
     public function update(Request $request, Payment $payment)
     {
         if ($request->user()->role !== 'admin') {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $validated = $request->validate([
-            'status' => 'required|string',
+        $data = $request->validate([
+            'amount' => 'sometimes|numeric|min:0',
+            'method' => 'sometimes|nullable|string',
+            'status' => 'sometimes|string',
+            'paid_at'=> 'sometimes|nullable|date',
         ]);
 
-        if ($validated['status'] === 'paid') {
-            $validated['paid_at'] = now();
-        }
+        $payment->update($data);
 
-        $payment->update($validated);
-
-        return response()->json([
-            'message' => 'Payment updated',
-            'data' => $payment
-        ]);
+        return response()->json(['data' => $payment]);
     }
 
-    // ADMIN: Delete
+    // ADMIN: Delete payment
     public function destroy(Request $request, Payment $payment)
     {
         if ($request->user()->role !== 'admin') {
@@ -77,7 +74,7 @@ class PaymentController extends Controller
 
         $payment->delete();
 
-        return response()->json(['message' => 'Payment deleted']);
+        return response()->json(['message' => 'Deleted']);
     }
 
     // CUSTOMER: My payments
@@ -88,8 +85,12 @@ class PaymentController extends Controller
         }
 
         $payments = Payment::whereHas('appointment', function ($q) use ($request) {
-            $q->where('customer_id', $request->user()->id);
-        })->with(['appointment.service'])->latest()->get();
+            $q->where('user_id', $request->user()->id)
+              ->orWhere('customer_id', $request->user()->id);
+        })
+        ->with(['appointment.service'])
+        ->latest()
+        ->get();
 
         return response()->json(['data' => $payments]);
     }

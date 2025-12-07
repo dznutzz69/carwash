@@ -4,134 +4,95 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Appointment;
+use App\Models\Payment;
 
 class AppointmentController extends Controller
 {
-    private function ensureAdmin(Request $request)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-    }
-
-    private function ensureCustomer(Request $request)
-    {
-        if ($request->user()->role !== 'customer') {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-    }
-
-    // -------------------------
-    // ADMIN: Get all appointments
-    // -------------------------
     public function index(Request $request)
     {
-        $this->ensureAdmin($request);
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error'=>'Unauthorized'],403);
+        }
 
-        $appointments = Appointment::with(['user', 'customer', 'service'])
-            ->orderBy('date')
-            ->orderBy('time')
-            ->get();
-
-        return response()->json($appointments); 
-        // Vue expects nested relations exactly like this structure.
+        $appointments = Appointment::with(['user','customer','service'])->latest()->get();
+        return response()->json(['data'=>$appointments]);
     }
 
-    // -------------------------
-    // ADMIN: Create appointment (walk-in)
-    // -------------------------
     public function store(Request $request)
     {
-        $this->ensureAdmin($request);
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error'=>'Unauthorized'],403);
+        }
 
         $request->validate([
             'customer_id' => 'required|exists:users,id',
-            'service_id'  => 'required|exists:services,id',
-            'date'        => 'required|date',
-            'time'        => 'required|string',
+            'service_id' => 'required|exists:services,id',
+            'date' => 'required|date',
+            'time' => 'required|string',
         ]);
 
         $appointment = Appointment::create([
-            'customer_id' => $request->customer_id, // walk-in
-            'service_id'  => $request->service_id,
-            'date'        => $request->date,
-            'time'        => $request->time,
-            'status'      => 'pending',
+            'customer_id' => $request->customer_id,
+            'service_id' => $request->service_id,
+            'date' => $request->date,
+            'time' => $request->time,
+            'status' => 'pending',
         ]);
 
-        return response()->json($appointment, 201);
+        return response()->json(['data'=>$appointment],201);
     }
 
-    // -------------------------
-    // ADMIN: Update (confirm/change status)
-    // -------------------------
     public function update(Request $request, Appointment $appointment)
     {
-        $this->ensureAdmin($request);
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error'=>'Unauthorized'],403);
+        }
 
-        $request->validate([
-            'status' => 'sometimes|string',
-            'date'   => 'sometimes|date',
-            'time'   => 'sometimes|string',
-        ]);
+        $appointment->update($request->only(['date','time','status']));
 
-        $appointment->update($request->only(['status','date','time']));
+        // Auto-create payment when marked as done
+        if ($request->status === 'done' && !$appointment->payment) {
+            Payment::create([
+                'appointment_id' => $appointment->id,
+                'amount' => $appointment->service->price,
+                'status' => 'pending'
+            ]);
+        }
 
-        return response()->json($appointment);
+        return response()->json(['data'=>$appointment]);
     }
 
-    // -------------------------
-    // ADMIN: Delete
-    // -------------------------
     public function destroy(Request $request, Appointment $appointment)
     {
-        $this->ensureAdmin($request);
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error'=>'Unauthorized'],403);
+        }
 
         $appointment->delete();
-
-        return response()->json(['message' => 'Deleted']);
+        return response()->json(['message'=>'Deleted']);
     }
 
-    // -------------------------
-    // CUSTOMER: List my bookings (Flutter)
-    // -------------------------
-    public function myAppointments(Request $request)
-    {
-        $this->ensureCustomer($request);
-
-        $appointments = Appointment::with('service')
-            ->where('user_id', $request->user()->id)
-            ->orderBy('date')
-            ->orderBy('time')
-            ->get();
-
-        return response()->json(['data' => $appointments]);
-    }
-
-    // -------------------------
-    // CUSTOMER: Book using Flutter
-    // -------------------------
+    // CUSTOMER MOBILE BOOKING
     public function bookAppointment(Request $request)
     {
-        $this->ensureCustomer($request);
+        if ($request->user()->role !== 'customer') {
+            return response()->json(['error'=>'Unauthorized'],403);
+        }
 
         $request->validate([
             'service_id' => 'required|exists:services,id',
-            'date'       => 'required|date',
-            'time'       => 'required|string',
+            'date' => 'required|date',
+            'time' => 'required|string',
         ]);
 
         $appointment = Appointment::create([
-            'user_id'    => $request->user()->id, // Flutter booking user
+            'user_id' => $request->user()->id,
             'service_id' => $request->service_id,
-            'date'       => $request->date,
-            'time'       => $request->time,
-            'status'     => 'pending',
+            'date' => $request->date,
+            'time' => $request->time,
+            'status' => 'pending',
         ]);
 
-        return response()->json([
-            'message' => 'Appointment booked successfully',
-            'data'    => $appointment
-        ], 201);
+        return response()->json(['message'=>'Booked','data'=>$appointment],201);
     }
 }

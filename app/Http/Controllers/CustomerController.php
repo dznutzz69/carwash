@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Customer;
+use App\Models\User;
 
 class CustomerController extends Controller
 {
@@ -13,7 +13,10 @@ class CustomerController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $customers = Customer::latest()->get();
+        $customers = User::where('role', 'customer')
+            ->select('id', 'name', 'email', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         return response()->json(['data' => $customers]);
     }
@@ -24,35 +27,22 @@ class CustomerController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $data = $request->validate([
+        $request->validate([
             'name'  => 'required|string|max:255',
-            'email' => 'nullable|email',
-            'phone' => 'nullable|string|max:50',
+            'email' => 'nullable|string|email|unique:users,email',
         ]);
 
-        $customer = Customer::create($data);
-
-        return response()->json(['data' => $customer], 201);
-    }
-
-    public function update(Request $request, Customer $customer)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        $data = $request->validate([
-            'name'  => 'sometimes|string|max:255',
-            'email' => 'sometimes|nullable|email',
-            'phone' => 'sometimes|nullable|string|max:50',
+        $user = User::create([
+            'name'     => $request->name,
+            'email'    => $request->email ?? null, // walk-in no email
+            'password' => bcrypt('password'),
+            'role'     => 'customer',
         ]);
 
-        $customer->update($data);
-
-        return response()->json(['data' => $customer]);
+        return response()->json(['message' => 'Customer added', 'data' => $user], 201);
     }
 
-    public function destroy(Request $request, Customer $customer)
+    public function destroy(Request $request, User $customer)
     {
         if ($request->user()->role !== 'admin') {
             return response()->json(['error' => 'Unauthorized'], 403);
@@ -60,6 +50,6 @@ class CustomerController extends Controller
 
         $customer->delete();
 
-        return response()->json(['message' => 'Deleted']);
+        return response()->json(['message' => 'Customer deleted']);
     }
 }
