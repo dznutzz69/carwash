@@ -7,64 +7,71 @@ use App\Models\Payment;
 
 class PaymentController extends Controller
 {
-    // -----------------------
-    // Admin: List all payments
-    // -----------------------
+    // ADMIN: View all payments
     public function index(Request $request)
     {
-        $user = $request->user();
-        if ($user->role !== 'admin') {
+        if ($request->user()->role !== 'admin') {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $payments = Payment::with('appointment')->get();
+        $payments = Payment::with([
+            'appointment.customer',
+            'appointment.service'
+        ])->latest()->get();
+
         return response()->json(['data' => $payments]);
     }
 
-    // -----------------------
-    // Admin: Create payment
-    // -----------------------
+    // ADMIN: Create payment
     public function store(Request $request)
     {
-        $user = $request->user();
-        if ($user->role !== 'admin') {
+        if ($request->user()->role !== 'admin') {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $request->validate([
+        $validated = $request->validate([
             'appointment_id' => 'required|exists:appointments,id',
-            'amount' => 'required|numeric',
-            'method' => 'required|string',
-            'status' => 'required|string'
+            'amount'         => 'required|numeric|min:0',
+            'method'         => 'nullable|string',
         ]);
 
-        $payment = Payment::create($request->all());
+        $validated['status'] = 'pending';
 
-        return response()->json(['data' => $payment], 201);
+        $payment = Payment::create($validated);
+
+        return response()->json([
+            'message' => 'Payment added successfully',
+            'data' => $payment
+        ], 201);
     }
 
-    // -----------------------
-    // Admin: Update payment
-    // -----------------------
+    // ADMIN: Confirm payment
     public function update(Request $request, Payment $payment)
     {
-        $user = $request->user();
-        if ($user->role !== 'admin') {
+        if ($request->user()->role !== 'admin') {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $payment->update($request->all());
+        $validated = $request->validate([
+            'status' => 'required|string',
+        ]);
 
-        return response()->json(['data' => $payment]);
+        if ($validated['status'] === 'paid') {
+            $validated['paid_at'] = now();
+        }
+
+        $payment->update($validated);
+
+        return response()->json([
+            'message' => 'Payment updated',
+            'data' => $payment
+        ]);
     }
 
-    // -----------------------
-    // Admin: Delete payment
-    // -----------------------
+    // ADMIN: Delete
     public function destroy(Request $request, Payment $payment)
     {
-        $user = $request->user();
-        if ($user->role !== 'admin') {
+        if ($request->user()->role !== 'admin') {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -73,19 +80,16 @@ class PaymentController extends Controller
         return response()->json(['message' => 'Payment deleted']);
     }
 
-    // -----------------------
-    // Customer: View own payments
-    // -----------------------
+    // CUSTOMER: My payments
     public function myPayments(Request $request)
     {
-        $user = $request->user();
-        if ($user->role !== 'customer') {
+        if ($request->user()->role !== 'customer') {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        $payments = Payment::whereHas('appointment', function ($q) use ($user) {
-            $q->where('customer_id', $user->id);
-        })->get();
+        $payments = Payment::whereHas('appointment', function ($q) use ($request) {
+            $q->where('customer_id', $request->user()->id);
+        })->with(['appointment.service'])->latest()->get();
 
         return response()->json(['data' => $payments]);
     }

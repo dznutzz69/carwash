@@ -7,29 +7,59 @@ use App\Models\Customer;
 
 class CustomerController extends Controller
 {
-    public function index() {
-        return Customer::all();
+    public function index(Request $request)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $customers = Customer::latest()->get();
+
+        return response()->json(['data' => $customers]);
     }
 
-    public function store(Request $request){
-        $request->validate([
+    public function store(Request $request)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $data = $request->validate([
             'name'  => 'required|string|max:255',
-            'email' => 'nullable|email|unique:customers,email',
-            'phone' => 'nullable|string|max:20'
+            'email' => 'nullable|email',
+            'phone' => 'nullable|string|max:50',
         ]);
 
-        $customer = Customer::create($request->only('name','email','phone'));
+        $customer = Customer::create($data);
 
-        return response()->json($customer);
+        return response()->json(['data' => $customer], 201);
     }
 
-    public function update(Request $request, Customer $customer){
-        $customer->update($request->only(['name','email','phone']));
-        return response()->json($customer);
+    public function update(Request $request, Customer $customer)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $data = $request->validate([
+            'name'  => 'sometimes|string|max:255',
+            'email' => 'sometimes|nullable|email',
+            'phone' => 'sometimes|nullable|string|max:50',
+        ]);
+
+        $customer->update($data);
+
+        return response()->json(['data' => $customer]);
     }
 
-    public function destroy(Customer $customer){
+    public function destroy(Request $request, Customer $customer)
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         $customer->delete();
-        return response()->json(['message'=>'Deleted']);
+
+        return response()->json(['message' => 'Deleted']);
     }
 }

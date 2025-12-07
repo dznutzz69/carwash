@@ -8,24 +8,72 @@ use App\Models\User;
 
 class AuthController extends Controller
 {
-    // API login
-    public function login(Request $request)
+    // ===========================
+    // REGISTER CUSTOMER (Flutter)
+    // ===========================
+    public function register(Request $request)
     {
-        $user = User::where('email', $request->email)->first();
+        $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email',
+            'password' => 'required|min:6'
+        ]);
 
-        if(!$user || !Hash::check($request->password, $user->password)){
-            return response()->json(['error'=>'Invalid credentials'], 401);
-        }
+        $user = User::create([
+            'name'     => $request->name,
+            'email'    => $request->email,
+            'password' => Hash::make($request->password),
+            'role'     => 'customer',    // 🔥 important
+        ]);
 
-        $token = $user->createToken('api_token')->plainTextToken;
-
-        return response()->json(['token'=>$token,'user'=>$user]);
+        return response()->json([
+            'message' => 'Registered successfully',
+            'user' => $user
+        ], 201);
     }
 
-    // API logout
+    // ===========================
+    // LOGIN
+    // ===========================
+    public function login(Request $request)
+    {
+        $request->validate([
+            'email'    => 'required|email',
+            'password' => 'required'
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'message' => 'Invalid login credentials'
+            ], 401);
+        }
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Login successful',
+            'token'   => $token,
+            'user'    => $user
+        ]);
+    }
+
+    // ===========================
+    // LOGOUT
+    // ===========================
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
-        return response()->json(['success'=>true]);
+        $request->user()->tokens()->delete();
+
+        return response()->json(['message' => 'Logged out successfully']);
+    }
+
+    // ===========================
+    // PROFILE
+    // ===========================
+    public function me(Request $request)
+    {
+        return response()->json($request->user());
     }
 }

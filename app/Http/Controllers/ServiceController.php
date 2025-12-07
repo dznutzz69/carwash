@@ -9,29 +9,54 @@ class ServiceController extends Controller
 {
     public function index()
     {
-        return Service::all();
+        return response()->json(Service::all());
     }
 
     public function store(Request $request)
     {
-        $service = Service::create($request->all());
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $data = $request->validate([
+            'name'        => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price'       => 'required|numeric|min:0',
+        ]);
+
+        $service = Service::create($data);
+
         return response()->json($service, 201);
     }
 
-    public function show(Service $service)
+    public function update(Request $request, $id)
     {
-        return $service;
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $service = Service::findOrFail($id);
+
+        $data = $request->validate([
+            'name'        => 'sometimes|string|max:255',
+            'description' => 'sometimes|nullable|string',
+            'price'       => 'sometimes|numeric|min:0',
+        ]);
+
+        $service->update($data);
+
+        return response()->json($service);
     }
 
-    public function update(Request $request, Service $service)
+    public function destroy(Request $request, $id)
     {
-        $service->update($request->all());
-        return response()->json($service, 200);
-    }
+        if ($request->user()->role !== 'admin') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
-    public function destroy(Service $service)
-    {
+        $service = Service::findOrFail($id);
         $service->delete();
-        return response()->json(null, 204);
+
+        return response()->json(['message' => 'Deleted']);
     }
 }

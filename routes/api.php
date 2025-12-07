@@ -1,54 +1,52 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\{
-    AuthController,
-    CustomerController,
-    ServiceController,
-    AppointmentController,
-    PaymentController
-};
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\AppointmentController;
+use App\Http\Controllers\PaymentController;
 
-// -------------------
-// Auth routes
-// -------------------
-Route::post('login', [AuthController::class, 'login']);
-Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+// --------- PUBLIC (NO AUTH) ---------
+Route::post('register', [AuthController::class, 'register']); // Flutter customer registration
+Route::post('login',    [AuthController::class, 'login']);    // Admin & customer login
 
-// -------------------
-// Admin routes (protected by Sanctum, role checked in controller)
-// -------------------
-Route::middleware('auth:sanctum')->group(function() {
-    // Services CRUD
-    Route::get('services', [ServiceController::class, 'index']);
-    Route::post('services', [ServiceController::class, 'store']);
-    Route::put('services/{id}', [ServiceController::class, 'update']);
-    Route::delete('services/{id}', [ServiceController::class, 'destroy']);
+// --------- PROTECTED (Sanctum) ---------
+Route::middleware('auth:sanctum')->group(function () {
 
-    // Appointments CRUD
-    Route::get('appointments', [AppointmentController::class, 'index']);
-    Route::post('appointments', [AppointmentController::class, 'store']);
-    Route::put('appointments/{id}', [AppointmentController::class, 'update']);
-    Route::delete('appointments/{id}', [AppointmentController::class, 'destroy']);
+    Route::post('logout', [AuthController::class, 'logout']);
+    Route::get('me',      [AuthController::class, 'me']);
 
-    // Payments CRUD
-    Route::get('payments', [PaymentController::class, 'index']);
-    Route::post('payments', [PaymentController::class, 'store']);
-    Route::put('payments/{id}', [PaymentController::class, 'update']);
-    Route::delete('payments/{id}', [PaymentController::class, 'destroy']);
+    // ===== SERVICES =====
+    // Admin manages, customers can list
+    Route::get('services',         [ServiceController::class, 'index']);   // all roles
+    Route::post('services',        [ServiceController::class, 'store']);   // admin
+    Route::put('services/{id}',    [ServiceController::class, 'update']);  // admin
+    Route::delete('services/{id}', [ServiceController::class, 'destroy']); // admin
 
-    // Customers CRUD
-    Route::get('customers', [CustomerController::class, 'index']);
-    Route::post('customers', [CustomerController::class, 'store']);
-    Route::put('customers/{id}', [CustomerController::class, 'update']);
-    Route::delete('customers/{id}', [CustomerController::class, 'destroy']);
-});
+    // ===== CUSTOMERS (Users with role = customer) =====
+    // Admin only
+    Route::get('customers',                 [CustomerController::class, 'index']);
+    Route::post('customers',                [CustomerController::class, 'store']);   // walk-in creation
+    Route::put('customers/{customer}',      [CustomerController::class, 'update']);
+    Route::delete('customers/{customer}',   [CustomerController::class, 'destroy']);
 
-// -------------------
-// Customer routes (protected by Sanctum, role checked in controller)
-// -------------------
-Route::middleware('auth:sanctum')->group(function() {
-    Route::get('my-appointments', [AppointmentController::class, 'myAppointments']);
-    Route::get('my-payments', [PaymentController::class, 'myPayments']);
+    // ===== APPOINTMENTS =====
+    // Admin: see all, create for walk-in/registered, edit, delete
+    Route::get('appointments',                      [AppointmentController::class, 'index']);
+    Route::post('appointments',                     [AppointmentController::class, 'store']);
+    Route::put('appointments/{appointment}',        [AppointmentController::class, 'update']);
+    Route::delete('appointments/{appointment}',     [AppointmentController::class, 'destroy']);
+
+    // Customer (Flutter): own appointments & booking
+    Route::get('my-appointments',   [AppointmentController::class, 'myAppointments']);
     Route::post('book-appointment', [AppointmentController::class, 'bookAppointment']);
+
+    // ===== PAYMENTS =====
+    Route::get('payments',          [PaymentController::class, 'index']);      // admin
+    Route::post('payments',         [PaymentController::class, 'store']);      // admin
+    Route::put('payments/{payment}',[PaymentController::class, 'update']);     // admin
+    Route::delete('payments/{payment}', [PaymentController::class, 'destroy']); // admin
+
+    Route::get('my-payments',       [PaymentController::class, 'myPayments']); // customer
 });
