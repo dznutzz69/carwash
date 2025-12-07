@@ -16,19 +16,21 @@ class AuthController extends Controller
         $request->validate([
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email',
-            'password' => 'required|min:6'
+            'password' => 'required|min:6',
+            'phone'    => 'required|string|max:20',
         ]);
 
         $user = User::create([
             'name'     => $request->name,
             'email'    => $request->email,
             'password' => Hash::make($request->password),
-            'role'     => 'customer',    // 🔥 important
+            'role'     => 'customer',
+            'phone'    => $request->phone,
         ]);
 
         return response()->json([
             'message' => 'Registered successfully',
-            'user' => $user
+            'user'    => $user,
         ], 201);
     }
 
@@ -39,14 +41,14 @@ class AuthController extends Controller
     {
         $request->validate([
             'email'    => 'required|email',
-            'password' => 'required'
+            'password' => 'required',
         ]);
 
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
-                'message' => 'Invalid login credentials'
+                'message' => 'Invalid login credentials',
             ], 401);
         }
 
@@ -55,7 +57,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Login successful',
             'token'   => $token,
-            'user'    => $user
+            'user'    => $user,
         ]);
     }
 

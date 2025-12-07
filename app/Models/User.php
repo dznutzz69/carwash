@@ -27,11 +27,31 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
     ];
 
+    /** 
+     * Default role assignment
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($user) {
+            if (!$user->role) {
+                $user->role = 'customer'; // default for Flutter
+            }
+        });
+    }
+
+    /**
+     * Relationship: A user can have many appointments
+     */
     public function appointments()
     {
         return $this->hasMany(Appointment::class, 'user_id');
     }
 
+    /**
+     * Relationship: A user can have many payments through appointments
+     */
     public function payments()
     {
         return $this->hasManyThrough(
@@ -40,5 +60,21 @@ class User extends Authenticatable
             'user_id',
             'appointment_id'
         );
+    }
+
+    /**
+     * Helper: Check if user is admin
+     */
+    public function isAdmin()
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Helper: Check if user is customer
+     */
+    public function isCustomer()
+    {
+        return $this->role === 'customer';
     }
 }

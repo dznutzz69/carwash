@@ -6,10 +6,16 @@ use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\DashboardController;
 
 // --------- PUBLIC (NO AUTH) ---------
 Route::post('register', [AuthController::class, 'register']); // Flutter customer registration
 Route::post('login',    [AuthController::class, 'login']);    // Admin & customer login
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('dashboard/stats', [DashboardController::class, 'stats']);
+    Route::get('dashboard/chart', [DashboardController::class, 'chartData']);
+});
+
 
 // --------- PROTECTED (Sanctum) ---------
 Route::middleware('auth:sanctum')->group(function () {
@@ -49,4 +55,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('payments/{payment}', [PaymentController::class, 'destroy']); // admin
 
     Route::get('my-payments',       [PaymentController::class, 'myPayments']); // customer
+
+    
 });

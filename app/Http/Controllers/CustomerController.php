@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class CustomerController extends Controller
 {
@@ -14,7 +15,7 @@ class CustomerController extends Controller
         }
 
         $customers = User::where('role', 'customer')
-            ->select('id', 'name', 'email', 'created_at')
+            ->select('id', 'name', 'email', 'phone', 'created_at')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -28,18 +29,24 @@ class CustomerController extends Controller
         }
 
         $request->validate([
-            'name'  => 'required|string|max:255',
-            'email' => 'nullable|string|email|unique:users,email',
+            'name'     => 'required|string|max:255',
+            'phone'    => 'required|string|max:15|unique:users,phone',
+            'password' => 'required|string|min:5',
+            'email'    => 'nullable|email|unique:users,email,NULL,id,email,NOT_NULL'
         ]);
 
         $user = User::create([
             'name'     => $request->name,
-            'email'    => $request->email ?? null, // walk-in no email
-            'password' => bcrypt('password'),
+            'phone'    => $request->phone,
+            'email'    => $request->email ?: null,
+            'password' => Hash::make($request->password),
             'role'     => 'customer',
         ]);
 
-        return response()->json(['message' => 'Customer added', 'data' => $user], 201);
+        return response()->json([
+            'message' => 'Customer created successfully',
+            'data' => $user
+        ], 201);
     }
 
     public function destroy(Request $request, User $customer)

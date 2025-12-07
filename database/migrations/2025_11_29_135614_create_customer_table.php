@@ -11,8 +11,13 @@ return new class extends Migration
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('email')->nullable();
-            $table->string('phone')->nullable();
+            
+            // Nullable because walk-in may not have email
+            $table->string('email')->nullable()->unique();
+
+            // REQUIRED phone number
+            $table->string('phone')->unique();
+
             $table->timestamps();
         });
     }
